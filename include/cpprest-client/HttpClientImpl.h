@@ -15,6 +15,19 @@ namespace cpprest_client {
         Config _config;
         std::shared_ptr <spdlog::logger> _logger;
 
+        // Connection Pool
+        static std::unordered_map <std::string, std::shared_ptr<web::http::client::http_client>> _connection_pool;
+        static std::mutex _pool_mutex;
+        static std::chrono::steady_clock::time_point _last_cleanup;
+
+        static bool _http2_warning_shown;
+
+        std::shared_ptr <web::http::client::http_client> get_or_create_client(const std::string &base_url);
+
+        void cleanup_expired_connections();
+
+        std::string extract_base_url(const std::string &full_url) const;
+
         // CORS preflight
         static const std::unordered_set <std::string> _preflight_methods;
 

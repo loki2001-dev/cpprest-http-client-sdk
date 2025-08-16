@@ -1,6 +1,8 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <vector>
+#include <future>
 #include "../include/cpprest-client/HttpClientImpl.h"
 #include "../include/cpprest-client/Config.h"
 #include "../include/cpprest-client/Exceptions.h"
@@ -8,45 +10,50 @@
 
 using namespace cpprest_client;
 
-void print_response(const HttpResponse &response) {
-    spdlog::info("Status: {}", response.status_code);
-    spdlog::info("Headers:");
-    for (const auto &[key, value]: response.headers) {
-        spdlog::info("  {}: {}", key, value);
+void print_response_summary(const HttpResponse &response, int request_num = 0) {
+    if (request_num > 0) {
+        spdlog::info("[RESPONSE] Request #{}: Status {} | Body size: {} bytes",
+                     request_num, response.status_code, response.body.length());
+    } else {
+        spdlog::info("[RESPONSE] Status Code: {}", response.status_code);
+
+        // Only show a few important headers
+        auto content_type = response.headers.find("content-type");
+        if (content_type != response.headers.end()) {
+            spdlog::info("[RESPONSE] Content-Type: {}", content_type->second);
+        }
+
+        // Truncate body for readability
+        std::string body = response.body;
+        if (body.length() > 200) {
+            body = body.substr(0, 200) + "... (truncated)";
+        }
+        spdlog::info("[RESPONSE] Body: {}", body);
+        spdlog::info("[RESPONSE] ---");
     }
-    spdlog::info("Body: {}", response.body);
-    spdlog::info("---");
 }
 
-int main() {
+void demo_basic_requests(HttpClientImpl &client) {
+    spdlog::info("\n[DEMO] === BASIC HTTP METHODS DEMONSTRATION ===");
+
     try {
-        spdlog::info("=== HTTP Client Example ===");
-
-        // 기본 설정으로 클라이언트 생성
-        Config config;
-        config.base_url = "https://jsonplaceholder.typicode.com";
-        config.set_json_content_type();
-        config.add_default_header("User-Agent", "CppRest-Client-Example/1.0");
-
-        HttpClientImpl client(config);
-
-        // 1. GET 요청
-        spdlog::info("\n1. GET /posts/1");
+        // 1. GET Request
+        spdlog::info("\n[TEST] 1. Executing GET /posts/1");
         auto get_response = client.get("/posts/1");
-        print_response(get_response);
+        print_response_summary(get_response);
 
-        // 2. POST 요청 (JSON)
-        spdlog::info("\n2. POST /posts (JSON)");
+        // 2. POST Request (JSON)
+        spdlog::info("\n[TEST] 2. Executing POST /posts with JSON payload");
         web::json::value post_data;
         post_data["title"] = web::json::value::string("My New Post");
         post_data["body"] = web::json::value::string("This is the content of my post");
         post_data["userId"] = web::json::value::number(1);
 
         auto post_response = client.post_json("/posts", post_data);
-        print_response(post_response);
+        print_response_summary(post_response);
 
-        // 3. PUT 요청
-        spdlog::info("\n3. PUT /posts/1");
+        // 3. PUT Request
+        spdlog::info("\n[TEST] 3. Executing PUT /posts/1");
         web::json::value put_data;
         put_data["id"] = web::json::value::number(1);
         put_data["title"] = web::json::value::string("Updated Post");
@@ -54,76 +61,271 @@ int main() {
         put_data["userId"] = web::json::value::number(1);
 
         auto put_response = client.put_json("/posts/1", put_data);
-        print_response(put_response);
+        print_response_summary(put_response);
 
-        // 4. PATCH 요청
-        spdlog::info("\n4. PATCH /posts/1");
-        web::json::value patch_data;
-        patch_data["title"] = web::json::value::string("Patched Title");
+        // Skip PATCH, DELETE, HEAD, OPTIONS for brevity in performance tests
+        spdlog::info("[DEMO] Basic HTTP methods demonstration completed successfully");
 
-        auto patch_response = client.patch_json("/posts/1", patch_data);
-        print_response(patch_response);
+    } catch (const std::exception &e) {
+        spdlog::error("[ERROR] Basic requests demo failed: {}", e.what());
+    }
+}
 
-        // 5. DELETE 요청
-        spdlog::info("\n5. DELETE /posts/1");
-        auto delete_response = client.del("/posts/1");
-        print_response(delete_response);
+void demo_async_requests(HttpClientImpl &client) {
+    spdlog::info("\n[DEMO] === ASYNCHRONOUS REQUESTS DEMONSTRATION ===");
 
-        // 6. HEAD 요청
-        spdlog::info("\n6. HEAD /posts/1");
-        auto head_response = client.head("/posts/1");
-        print_response(head_response);
-
-        // 7. OPTIONS 요청
-        spdlog::info("\n7. OPTIONS /posts");
-        auto options_response = client.options("/posts");
-        print_response(options_response);
-
-        // 8. Bearer Token 설정 예제
-        spdlog::info("\n8. Bearer Token 예제");
-        config.set_bearer_token("your-secret-token");
-        client.update_config(config);
-
-        auto auth_response = client.get("/posts/1");
-        print_response(auth_response);
-
-        // 9. 비동기 요청 예제
-        spdlog::info("\n9. 비동기 GET 요청");
+    try {
+        // Single Async Request
+        spdlog::info("\n[TEST] Executing single asynchronous GET request");
         auto future_response = client.get_async("/posts/2");
 
-        spdlog::info("다른 작업 수행 중...");
+        spdlog::info("[INFO] Performing other tasks while request is in progress...");
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
+        spdlog::info("[INFO] Waiting for async response...");
         auto async_response = future_response.get();
-        print_response(async_response);
+        print_response_summary(async_response);
 
-        // 10. 여러 비동기 요청 동시 실행
-        spdlog::info("\n10. 여러 비동기 요청 동시 실행");
+        // Multiple Concurrent Async Requests (Connection Pool Test)
+        spdlog::info("\n[TEST] Executing 5 concurrent async requests");
         std::vector <std::future<HttpResponse>> futures;
 
-        for (int i = 1; i <= 3; ++i) {
+        auto start_time = std::chrono::high_resolution_clock::now();
+
+        for (int i = 1; i <= 5; ++i) {
             futures.push_back(client.get_async("/posts/" + std::to_string(i)));
         }
 
+        spdlog::info("[INFO] {} concurrent requests initiated", futures.size());
+
         for (size_t i = 0; i < futures.size(); ++i) {
-            spdlog::info("Response {}", i + 1);
-            print_response(futures[i].get());
+            auto response = futures[i].get();
+            print_response_summary(response, i + 1);
         }
 
-    } catch (const HttpStatusException &e) {
-        spdlog::error("HTTP Error: {}", e.what());
-        spdlog::error("Status Code: {}", e.status_code());
-        spdlog::error("Response Body: {}", e.response_body());
-    } catch (const NetworkException &e) {
-        spdlog::error("Network Error: {}", e.what());
-    } catch (const TimeoutException &e) {
-        spdlog::error("Timeout Error: {}", e.what());
-    } catch (const JsonException &e) {
-        spdlog::error("JSON Error: {}", e.what());
-    } catch (const HttpClientException &e) {
-        spdlog::error("HTTP Client Error: {}", e.what());
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        spdlog::info("[PERF] 5 concurrent requests completed in: {}ms", duration.count());
+
+        spdlog::info("[DEMO] Asynchronous requests demonstration completed successfully");
+
     } catch (const std::exception &e) {
-        spdlog::error("Unknown Error: {}", e.what());
+        spdlog::error("[ERROR] Async requests demo failed: {}", e.what());
+    }
+}
+
+void demo_connection_pool_performance(HttpClientImpl &client_with_pool, HttpClientImpl &client_without_pool) {
+    spdlog::info("\n[DEMO] ===== CONNECTION POOL PERFORMANCE COMPARISON =====");
+
+    const int num_requests = 500;
+
+    try {
+        ////////////////////////////////////////
+        // Test: with Connection Pool
+        ////////////////////////////////////////
+        spdlog::info("\n[TEST] Performance Test 1: Connection Pool ENABLED");
+        auto start_with_pool = std::chrono::high_resolution_clock::now();
+
+        std::vector <std::future<HttpResponse>> futures_with_pool;
+        for (int i = 1; i <= num_requests; ++i) {
+            futures_with_pool.push_back(client_with_pool.get_async("/posts/" + std::to_string(i % 5 + 1)));
+        }
+
+        spdlog::info("[INFO] {} requests initiated with connection pool", num_requests);
+
+        int completed_with_pool = 0;
+        for (auto &future: futures_with_pool) {
+            future.get();
+            completed_with_pool++;
+            if (completed_with_pool % 5 == 0) {
+                spdlog::info("[PROGRESS] Completed {}/{} requests (with pool)", completed_with_pool, num_requests);
+            }
+        }
+
+        auto end_with_pool = std::chrono::high_resolution_clock::now();
+        auto duration_with_pool = std::chrono::duration_cast<std::chrono::milliseconds>(
+                end_with_pool - start_with_pool);
+
+        ////////////////////////////////////////
+        // Test without Connection Pool
+        ////////////////////////////////////////
+        spdlog::info("\n[TEST] Performance Test 2: Connection Pool DISABLED");
+        auto start_without_pool = std::chrono::high_resolution_clock::now();
+
+        std::vector <std::future<HttpResponse>> futures_without_pool;
+        for (int i = 1; i <= num_requests; ++i) {
+            futures_without_pool.push_back(client_without_pool.get_async("/posts/" + std::to_string(i % 5 + 1)));
+        }
+
+        spdlog::info("[INFO] {} requests initiated without connection pool", num_requests);
+
+        int completed_without_pool = 0;
+        for (auto &future: futures_without_pool) {
+            future.get();
+            completed_without_pool++;
+            if (completed_without_pool % 5 == 0) {
+                spdlog::info("[PROGRESS] Completed {}/{} requests (without pool)", completed_without_pool,
+                             num_requests);
+            }
+        }
+
+        auto end_without_pool = std::chrono::high_resolution_clock::now();
+        auto duration_without_pool = std::chrono::duration_cast<std::chrono::milliseconds>(
+                end_without_pool - start_without_pool);
+
+        ////////////////////////////////////////
+        // Performance Comparison Results
+        ////////////////////////////////////////
+        spdlog::info("\n[RESULTS] === PERFORMANCE COMPARISON RESULTS ===");
+        spdlog::info("[PERF] With Connection Pool:    {}ms", duration_with_pool.count());
+        spdlog::info("[PERF] Without Connection Pool: {}ms", duration_without_pool.count());
+
+        if (duration_with_pool < duration_without_pool) {
+            double improvement =
+                    ((double) (duration_without_pool - duration_with_pool).count() / duration_without_pool.count()) *
+                    100;
+            spdlog::info("[PERF] Performance improvement: {:.1f}% faster with connection pool", improvement);
+        } else if (duration_without_pool < duration_with_pool) {
+            double degradation =
+                    ((double) (duration_with_pool - duration_without_pool).count() / duration_with_pool.count()) * 100;
+            spdlog::warn("[PERF] Connection pool was {:.1f}% slower (may indicate overhead for small request count)",
+                         degradation);
+        } else {
+            spdlog::info("[PERF] No significant performance difference observed");
+        }
+        spdlog::info("[DEMO] Connection pool performance comparison completed");
+    } catch (const std::exception &e) {
+        spdlog::error("[ERROR] Performance comparison failed: {}", e.what());
+    }
+}
+
+void demo_http2_features(HttpClientImpl &client) {
+    spdlog::info("\n[DEMO] === HTTP/2 FEATURES DEMONSTRATION ===");
+
+    try {
+        // HTTP/2 Multiplexing Test with Concurrent Requests
+        spdlog::info("\n[TEST] HTTP/2 Multiplexing Test - Concurrent Request Processing");
+
+        std::vector <std::future<HttpResponse>> futures;
+        auto start_time = std::chrono::high_resolution_clock::now();
+
+        // Send multiple requests to same host simultaneously (HTTP/2 Multiplexing effect)
+        for (int i = 1; i <= 8; ++i) {
+            futures.push_back(client.get_async("/posts/" + std::to_string(i)));
+        }
+
+        spdlog::info("[INFO] 8 concurrent requests sent (attempting HTTP/2 multiplexing)");
+
+        int completed = 0;
+        for (auto &future: futures) {
+            auto response = future.get();
+            completed++;
+            if (completed % 2 == 0 || completed == 1 || completed == 8) {
+                spdlog::info("[PROGRESS] Request {} of 8 completed (Status: {})", completed, response.status_code);
+            }
+        }
+
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        spdlog::info("[PERF] 8 concurrent requests processed in: {}ms", duration.count());
+
+        spdlog::info("[DEMO] HTTP/2 features demonstration completed successfully");
+
+    } catch (const std::exception &e) {
+        spdlog::error("[ERROR] HTTP/2 demo failed: {}", e.what());
+    }
+}
+
+void demo_bearer_token(HttpClientImpl &client) {
+    spdlog::info("\n[DEMO] === BEARER TOKEN AUTHENTICATION DEMONSTRATION ===");
+
+    try {
+        // Configure Bearer Token
+        spdlog::info("[CONFIG] Setting up Bearer Token authentication");
+        Config config = client.get_config();
+        config.add_default_header("Authorization", "Bearer your-secret-token-12345");
+        client.update_config(config);
+
+        spdlog::info("[TEST] Executing authenticated request with Bearer Token");
+        auto auth_response = client.get("/posts/1");
+        print_response_summary(auth_response);
+
+        spdlog::info("[DEMO] Bearer token authentication demonstration completed");
+
+    } catch (const std::exception &e) {
+        spdlog::error("[ERROR] Bearer token demo failed: {}", e.what());
+    }
+}
+
+int main() {
+    try {
+        // Set log level to info to reduce noise, change to debug for detailed logging
+        spdlog::set_level(spdlog::level::info);
+        spdlog::info("[MAIN] === Enhanced HTTP Client Example with HTTP/2 & Connection Pool ===");
+
+        Config config_with_pool;
+
+        // 1. Configuration with HTTP/2 and Connection Pool enabled
+        {
+            spdlog::info("[CONFIG] Initializing HTTP client with enhanced features");
+            config_with_pool.base_url = "https://jsonplaceholder.typicode.com";
+            config_with_pool.add_default_header("Content-Type", "application/json");
+            config_with_pool.add_default_header("User-Agent", "CppRest-Client-Enhanced/2.0");
+
+            // Enable (HTTP/2, Connection Pool)
+            config_with_pool.enable_http2 = true;
+            config_with_pool.enable_connection_pool = true;
+            config_with_pool.enable_keep_alive = true;
+            config_with_pool.max_connections_per_host = 6;
+            config_with_pool.connection_idle_timeout = std::chrono::seconds(30);
+            config_with_pool.max_concurrent_streams = 100;
+        }
+
+
+        HttpClientImpl client_with_pool(config_with_pool);
+
+        // 2. Configuration without Connection Pool (for performance comparison)
+        {
+            Config config_without_pool = config_with_pool;
+            config_without_pool.enable_connection_pool = false;
+            HttpClientImpl client_without_pool(config_without_pool);
+
+            // Execute Demonstrations
+            spdlog::info("[MAIN] Starting demonstration sequence");
+            demo_basic_requests(client_with_pool);
+            demo_async_requests(client_with_pool);
+            demo_http2_features(client_with_pool);
+            demo_connection_pool_performance(client_with_pool, client_without_pool);
+            demo_bearer_token(client_with_pool);
+
+            // Display Current Configuration Summary
+            spdlog::info("\n\n[CONFIG] === FINAL CONFIGURATION SUMMARY ===");
+            const auto &current_config = client_with_pool.get_config();
+            spdlog::info("[CONFIG] Base URL: {}", current_config.base_url);
+            spdlog::info("[CONFIG] HTTP/2: {}", current_config.enable_http2 ? "ENABLED" : "DISABLED");
+            spdlog::info("[CONFIG] Connection Pool: {}", current_config.enable_connection_pool ? "ENABLED" : "DISABLED");
+            spdlog::info("[CONFIG] Keep-Alive: {}", current_config.enable_keep_alive ? "ENABLED" : "DISABLED");
+            spdlog::info("[CONFIG] Max Connections/Host: {}", current_config.max_connections_per_host);
+            spdlog::info("[CONFIG] Max Concurrent Streams: {}", current_config.max_concurrent_streams);
+        }
+
+        spdlog::info("\n[MAIN] === ALL DEMONSTRATIONS COMPLETED SUCCESSFULLY ===");
+
+    } catch (const HttpStatusException &e) {
+        spdlog::error("[HTTP_ERROR] HTTP Status Error: {} (Code: {})", e.what(), e.status_code());
+        if (!e.response_body().empty()) {
+            spdlog::error("[HTTP_ERROR] Response: {}", e.response_body().substr(0, 200));
+        }
+    } catch (const NetworkException &e) {
+        spdlog::error("[NETWORK_ERROR] Network connectivity issue: {}", e.what());
+    } catch (const TimeoutException &e) {
+        spdlog::error("[TIMEOUT_ERROR] Request timeout: {}", e.what());
+    } catch (const JsonException &e) {
+        spdlog::error("[JSON_ERROR] JSON processing error: {}", e.what());
+    } catch (const HttpClientException &e) {
+        spdlog::error("[CLIENT_ERROR] HTTP client error: {}", e.what());
+    } catch (const std::exception &e) {
+        spdlog::error("[UNKNOWN_ERROR] Unexpected error: {}", e.what());
     }
 
     return 0;
