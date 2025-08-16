@@ -8,15 +8,17 @@
 ---
 
 ## Features
-- Supports all HTTP methods**: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`
-- Automatic CORS Preflight handling**: Works like a browser
-- Three execution modes**: Synchronous, Asynchronous, **C++20 Coroutines**
-- Bearer Token Management**: Easy authentication token handling
-- JSON Support**: Automatic JSON serialization/deserialization
-- Configurable**: Timeout, SSL, default headers, etc.
-- Structured Logging**: spdlog-based logging
-- Comprehensive Tests**: Google Test-based unit tests
-- Exception Safety**: Clear exception hierarchy
+- Supports all HTTP methods: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`
+- Automatic CORS Preflight handling: Works like a browser
+- Three execution modes: Synchronous, Asynchronous, **C++20 Coroutines**
+- Bearer Token Management: Easy authentication token handling
+- JSON Support: Automatic JSON serialization/deserialization
+- Configurable: Timeout, SSL, default headers, etc.
+- Structured Logging: spdlog-based logging
+- Comprehensive Tests: Google Test-based unit tests
+- Exception Safety: Clear exception hierarchy
+- **HTTP/2** Support: Modern, efficient transport with multiplexing
+- **Connection Pool**: Optimized resource reuse for high-performance workloads
 
 ---
 
