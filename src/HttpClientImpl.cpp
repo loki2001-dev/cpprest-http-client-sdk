@@ -7,7 +7,7 @@
 namespace cpprest_client {
 
     // CORS preflight
-    const std::unordered_set <std::string> HttpClientImpl::preflight_methods_ = {
+    const std::unordered_set <std::string> HttpClientImpl::_preflight_methods = {
             "PUT", "DELETE", "PATCH", "POST"
     };
 
@@ -25,11 +25,11 @@ namespace cpprest_client {
             return url;
         }
 
-        if (config_.base_url.empty()) {
+        if (_config.base_url.empty()) {
             throw InvalidUrlException("No base URL configured and relative URL provided: " + url);
         }
 
-        std::string result = config_.base_url;
+        std::string result = _config.base_url;
         if (!result.ends_with("/") && !url.starts_with("/")) {
             result += "/";
         }
@@ -43,15 +43,15 @@ namespace cpprest_client {
         web::http::http_headers headers;
 
         // Header
-        for (const auto &[key, value]: config_.default_headers) {
+        for (const auto &[key, value]: _config.default_headers) {
             headers.add(utility::conversions::to_string_t(key),
                         utility::conversions::to_string_t(value));
         }
 
         // User-Agent 설정
-        if (!config_.user_agent.empty()) {
+        if (!_config.user_agent.empty()) {
             headers.add(web::http::header_names::user_agent,
-                        utility::conversions::to_string_t(config_.user_agent));
+                        utility::conversions::to_string_t(_config.user_agent));
         }
 
         // Header (additional)
@@ -67,10 +67,10 @@ namespace cpprest_client {
         web::http::client::http_client_config client_config;
 
         // timout
-        client_config.set_timeout(config_.connect_timeout + config_.read_timeout);
+        client_config.set_timeout(_config.connect_timeout + _config.read_timeout);
 
         // SSL
-        if (!config_.verify_ssl) {
+        if (!_config.verify_ssl) {
             client_config.set_validate_certificates(false);
         }
 
@@ -95,7 +95,7 @@ namespace cpprest_client {
                 try {
                     result.json_body = web::json::value::parse(utility::conversions::to_string_t(result.body));
                 } catch (const web::json::json_exception &e) {
-                    logger_->warn("Failed to parse JSON response: {}", e.what());
+                    _logger->warn("Failed to parse JSON response: {}", e.what());
                 }
             }
         }

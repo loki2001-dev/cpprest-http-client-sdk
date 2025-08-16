@@ -37,8 +37,8 @@ namespace cpprest_client {
     public:
         HttpStatusException(int status_code, const std::string& message, const std::string& response_body = "")
             : HttpClientException("HTTP " + std::to_string(status_code) + ": " + message),
-            status_code_(status_code),
-            response_body_(response_body) {
+            _status_code(status_code),
+            _response_body(response_body) {
 
         }
 

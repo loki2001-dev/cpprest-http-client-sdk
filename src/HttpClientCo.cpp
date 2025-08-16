@@ -6,7 +6,7 @@
 
 namespace cpprest_client {
 
-    const std::unordered_set <std::string> HttpClientCo::preflight_methods_ = {
+    const std::unordered_set <std::string> HttpClientCo::_preflight_methods = {
             "PUT", "DELETE", "PATCH", "POST"
     };
 
@@ -16,7 +16,7 @@ namespace cpprest_client {
     }
 
     void HttpClientCo::update_config(const HttpClientConfig &config) {
-        config_ = config;
+        _config = config;
     }
 
     std::string HttpClientCo::build_url(const std::string &url) const {
@@ -24,11 +24,11 @@ namespace cpprest_client {
             return url;
         }
 
-        if (config_.base_url.empty()) {
+        if (_config.base_url.empty()) {
             throw MalformedUrlException("No base URL configured and relative URL provided: " + url);
         }
 
-        std::string result = config_.base_url;
+        std::string result = _config.base_url;
         if (!result.ends_with("/") && !url.starts_with("/")) {
             result += "/";
         }
@@ -40,12 +40,12 @@ namespace cpprest_client {
             const std::unordered_map <std::string, std::string> &additional_headers) const {
 
         web::http::http_headers headers;
-        for (const auto &[key, value]: config_.default_headers) {
+        for (const auto &[key, value]: _config.default_headers) {
             headers.add(utility::conversions::to_string_t(key), utility::conversions::to_string_t(value));
         }
 
-        if (!config_.user_agent.empty()) {
-            headers.add(web::http::header_names::user_agent, utility::conversions::to_string_t(config_.user_agent));
+        if (!_config.user_agent.empty()) {
+            headers.add(web::http::header_names::user_agent, utility::conversions::to_string_t(_config.user_agent));
         }
 
         for (const auto &[key, value]: additional_headers) {
@@ -57,8 +57,8 @@ namespace cpprest_client {
 
     web::http::client::http_client_config HttpClientCo::create_client_config() const {
         web::http::client::http_client_config client_config;
-        client_config.set_timeout(config_.connect_timeout + config_.read_timeout);
-        if (!config_.verify_ssl) {
+        client_config.set_timeout(_config.connect_timeout + _config.read_timeout);
+        if (!_config.verify_ssl) {
             client_config.set_validate_certificates(false);
         }
         return client_config;
@@ -129,49 +129,63 @@ namespace cpprest_client {
                 return false;
             });
         } catch (const std::exception &e) {
-            logger_->error("CORS preflight error: {}", e.what());
+            _logger->error("CORS preflight error: {}", e.what());
             return pplx::task_from_result(false);
         }
     }
 
-    pplx::task <HttpResult> HttpClientCo::execute_request_co(const std::string &url,
-                                                             web::http::method method,
-                                                             const std::string &body,
-                                                             const std::unordered_map <std::string, std::string> &headers) {
+    pplx::task<HttpResult> HttpClientCo::execute_request_co(const std::string &url,
+                                                            web::http::method method,
+                                                            const std::string &body,
+                                                            const std::unordered_map<std::string, std::string> &headers) {
         try {
             std::string full_url = build_url(url);
             _logger->info("HTTP {} {}", utility::conversions::to_utf8string(method), full_url);
 
-            web::http::client::http_client client(utility::conversions::to_string_t(full_url), create_client_config());
+            auto client = std::make_shared<web::http::client::http_client>(
+                    utility::conversions::to_string_t(full_url), create_client_config());
 
             std::string method_str = utility::conversions::to_utf8string(method);
             auto merged_headers = merge_headers(headers);
 
-            auto send_request = [this, client, method, body, merged_headers]() mutable -> pplx::task <HttpResult> {
+            auto send_request = [this, client, method, body, merged_headers]() -> pplx::task<HttpResult> {
                 web::http::http_request req(method);
-                req.headers() = merged_headers;
+
+                // header
+                for (const auto& [key, value] : merged_headers) {
+                    req.headers().add(utility::conversions::to_string_t(key),
+                                      utility::conversions::to_string_t(value));
+                }
+
+                // body
                 if (!body.empty()) {
                     req.set_body(utility::conversions::to_string_t(body));
                 }
-                return client.request(req).then([this](web::http::http_response response) {
+
+                // request
+                return client->request(req).then([this](web::http::http_response response) {
                     return convert_response(response);
                 });
             };
 
-            if (preflight_methods_.count(method_str) > 0) {
+            if (_preflight_methods.count(method_str) > 0) {
                 return execute_preflight_co(url, method, headers).then(
-                        [this, send_request](bool preflight_ok) mutable -> pplx::task <HttpResult> {
+                        [this, send_request](bool preflight_ok) -> pplx::task<HttpResult> {
                             if (!preflight_ok) {
                                 _logger->warn("CORS preflight failed, proceeding with request anyway");
-                                return send_request();
-                            });
-                        } else {
-                    return send_request();
-                }
-            } catch (const std::exception &e) {
-                logger_->error("HTTP request failed: {}", e.what());
+                            }
+                            return send_request();
+                        }
+                );
+            } else {
+                return send_request();
             }
+
+        } catch (const std::exception &e) {
+            _logger->error("HTTP request failed: {}", e.what());
+            return pplx::task_from_result(HttpResult{}); // 실패 시 기본값 반환
         }
+    }
 
 // Sync
 #define DEFINE_SYNC_METHOD(NAME, METHOD) \

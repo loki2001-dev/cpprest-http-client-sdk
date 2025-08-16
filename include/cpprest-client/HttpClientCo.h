@@ -129,7 +129,7 @@ namespace cpprest_client {
 
         HttpResult convert_response(const web::http::http_response &response);
 
-        static const std::unordered_set <std::string> preflight_methods_;
+        static const std::unordered_set <std::string> _preflight_methods;
     };
 
 } // namespace cpprest_client

@@ -16,7 +16,7 @@ namespace cpprest_client {
         std::shared_ptr<spdlog::logger> _logger;
 
         // CORS preflight
-        static const std::unordered_set<std::string> preflight_methods_;
+        static const std::unordered_set<std::string> _preflight_methods;
 
         std::string build_url(const std::string& url) const;
 
@@ -47,7 +47,7 @@ namespace cpprest_client {
 
         void update_config(const Config& config);
 
-        const Config& get_config() const { return config_; }
+        const Config& get_config() const { return _config; }
 
         // IHttpClient
         HttpResponse get(const std::string& url,
