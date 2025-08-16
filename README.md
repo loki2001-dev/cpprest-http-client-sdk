@@ -67,6 +67,7 @@ cpprest-http-client-sdk/
 ├── CMakeLists.txt              # CMake build configuration
 ├── include/cpprest_client/     # Header files
 │   ├── IHttpClient.h           # HTTP client interface
+│   ├── HttpClientLogger.h      # Logger implementation
 │   ├── HttpClientImpl.h        # Implementation class
 │   ├── HttpClientCo.h          # Coroutine implementation
 │   ├── Exceptions.h            # Exception classes
