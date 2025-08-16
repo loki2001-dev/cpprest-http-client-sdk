@@ -134,10 +134,10 @@ namespace cpprest_client {
         }
     }
 
-    pplx::task<HttpResult> HttpClientCo::execute_request_co(const std::string &url,
-                                                            web::http::method method,
-                                                            const std::string &body,
-                                                            const std::unordered_map<std::string, std::string> &headers) {
+    pplx::task <HttpResult> HttpClientCo::execute_request_co(const std::string &url,
+                                                             web::http::method method,
+                                                             const std::string &body,
+                                                             const std::unordered_map <std::string, std::string> &headers) {
         try {
             std::string full_url = build_url(url);
             _logger->info("HTTP {} {}", utility::conversions::to_utf8string(method), full_url);
@@ -148,11 +148,11 @@ namespace cpprest_client {
             std::string method_str = utility::conversions::to_utf8string(method);
             auto merged_headers = merge_headers(headers);
 
-            auto send_request = [this, client, method, body, merged_headers]() -> pplx::task<HttpResult> {
+            auto send_request = [this, client, method, body, merged_headers]() -> pplx::task <HttpResult> {
                 web::http::http_request req(method);
 
                 // header
-                for (const auto& [key, value] : merged_headers) {
+                for (const auto &[key, value]: merged_headers) {
                     req.headers().add(utility::conversions::to_string_t(key),
                                       utility::conversions::to_string_t(value));
                 }
@@ -170,7 +170,7 @@ namespace cpprest_client {
 
             if (_preflight_methods.count(method_str) > 0) {
                 return execute_preflight_co(url, method, headers).then(
-                        [this, send_request](bool preflight_ok) -> pplx::task<HttpResult> {
+                        [this, send_request](bool preflight_ok) -> pplx::task <HttpResult> {
                             if (!preflight_ok) {
                                 _logger->warn("CORS preflight failed, proceeding with request anyway");
                             }
@@ -193,19 +193,19 @@ HttpResult HttpClientCo::NAME##_co(const std::string& url, const std::string& bo
     return execute_request_co(url, METHOD, body, headers).get(); \
 }
 
-        DEFINE_SYNC_METHOD(get, web::http::methods::GET)
+    DEFINE_SYNC_METHOD(get, web::http::methods::GET)
 
-        DEFINE_SYNC_METHOD(post, web::http::methods::POST)
+    DEFINE_SYNC_METHOD(post, web::http::methods::POST)
 
-        DEFINE_SYNC_METHOD(put, web::http::methods::PUT)
+    DEFINE_SYNC_METHOD(put, web::http::methods::PUT)
 
-        DEFINE_SYNC_METHOD(patch, web::http::methods::PATCH)
+    DEFINE_SYNC_METHOD(patch, web::http::methods::PATCH)
 
-        DEFINE_SYNC_METHOD(del, web::http::methods::DEL)
+    DEFINE_SYNC_METHOD(del, web::http::methods::DEL)
 
-        DEFINE_SYNC_METHOD(head, web::http::methods::HEAD)
+    DEFINE_SYNC_METHOD(head, web::http::methods::HEAD)
 
-        DEFINE_SYNC_METHOD(options, web::http::methods::OPTIONS)
+    DEFINE_SYNC_METHOD(options, web::http::methods::OPTIONS)
 
 // Async
 #define DEFINE_ASYNC_METHOD(NAME, METHOD) \
@@ -214,18 +214,18 @@ std::future<HttpResult> HttpClientCo::NAME##_async(const std::string& url, const
     return std::async(std::launch::async, [task]() { return task.get(); }); \
 }
 
-        DEFINE_ASYNC_METHOD(get, web::http::methods::GET)
+    DEFINE_ASYNC_METHOD(get, web::http::methods::GET)
 
-        DEFINE_ASYNC_METHOD(post, web::http::methods::POST)
+    DEFINE_ASYNC_METHOD(post, web::http::methods::POST)
 
-        DEFINE_ASYNC_METHOD(put, web::http::methods::PUT)
+    DEFINE_ASYNC_METHOD(put, web::http::methods::PUT)
 
-        DEFINE_ASYNC_METHOD(patch, web::http::methods::PATCH)
+    DEFINE_ASYNC_METHOD(patch, web::http::methods::PATCH)
 
-        DEFINE_ASYNC_METHOD(del, web::http::methods::DEL)
+    DEFINE_ASYNC_METHOD(del, web::http::methods::DEL)
 
-        DEFINE_ASYNC_METHOD(head, web::http::methods::HEAD)
+    DEFINE_ASYNC_METHOD(head, web::http::methods::HEAD)
 
-        DEFINE_ASYNC_METHOD(options, web::http::methods::OPTIONS)
+    DEFINE_ASYNC_METHOD(options, web::http::methods::OPTIONS)
 
 } // namespace cpprest_client

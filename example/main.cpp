@@ -8,10 +8,10 @@
 
 using namespace cpprest_client;
 
-void print_response(const HttpResponse& response) {
+void print_response(const HttpResponse &response) {
     spdlog::info("Status: {}", response.status_code);
     spdlog::info("Headers:");
-    for (const auto& [key, value] : response.headers) {
+    for (const auto &[key, value]: response.headers) {
         spdlog::info("  {}: {}", key, value);
     }
     spdlog::info("Body: {}", response.body);
@@ -99,7 +99,7 @@ int main() {
 
         // 10. 여러 비동기 요청 동시 실행
         spdlog::info("\n10. 여러 비동기 요청 동시 실행");
-        std::vector<std::future<HttpResponse>> futures;
+        std::vector <std::future<HttpResponse>> futures;
 
         for (int i = 1; i <= 3; ++i) {
             futures.push_back(client.get_async("/posts/" + std::to_string(i)));
@@ -110,19 +110,19 @@ int main() {
             print_response(futures[i].get());
         }
 
-    } catch (const HttpStatusException& e) {
+    } catch (const HttpStatusException &e) {
         spdlog::error("HTTP Error: {}", e.what());
         spdlog::error("Status Code: {}", e.status_code());
         spdlog::error("Response Body: {}", e.response_body());
-    } catch (const NetworkException& e) {
+    } catch (const NetworkException &e) {
         spdlog::error("Network Error: {}", e.what());
-    } catch (const TimeoutException& e) {
+    } catch (const TimeoutException &e) {
         spdlog::error("Timeout Error: {}", e.what());
-    } catch (const JsonException& e) {
+    } catch (const JsonException &e) {
         spdlog::error("JSON Error: {}", e.what());
-    } catch (const HttpClientException& e) {
+    } catch (const HttpClientException &e) {
         spdlog::error("HTTP Client Error: {}", e.what());
-    } catch (const std::exception& e) {
+    } catch (const std::exception &e) {
         spdlog::error("Unknown Error: {}", e.what());
     }
 
