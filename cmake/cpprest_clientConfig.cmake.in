@@ -1,0 +1,10 @@
+@PACKAGE_INIT@
+
+INCLUDE(CMakeFindDependencyMacro)
+
+FIND_DEPENDENCY(Boost REQUIRED COMPONENTS system filesystem thread chrono)
+FIND_DEPENDENCY(OpenSSL REQUIRED)
+FIND_DEPENDENCY(spdlog REQUIRED)
+FIND_DEPENDENCY(cpprestsdk REQUIRED)
+
+INCLUDE("${CMAKE_CURRENT_LIST_DIR}/cpprest_clientTargets.cmake")
