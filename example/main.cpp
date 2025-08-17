@@ -9,6 +9,7 @@
 #include "../include/cpprest-client/BearerAuth.h"
 #include "../include/cpprest-client/BasicAuth.h"
 #include "../include/cpprest-client/DigestAuth.h"
+#include "../include/cpprest-client/OAuth2Auth.h"
 #include <spdlog/spdlog.h>
 #include <cpprest/http_msg.h>
 
@@ -296,8 +297,23 @@ void demo_authentication_strategies(HttpClientImpl &client) {
         auto digest_response = client.get("/posts/3");
         print_response_summary(digest_response);
 
-        // 4. Clear Authentication
-        spdlog::info("\n[TEST] 4. Clearing Authentication");
+        // 4. OAuth2 Authentication
+        spdlog::info("\n[TEST] 4. OAuth2 Authentication");
+        Config config;
+        config.set_json_content_type();
+        config.set_bearer_token("initial-access-token", std::chrono::seconds(10));
+        config.set_refresh_token("dummy-refresh-token");
+        config.set_refresh_callback([](const std::string& refresh_token) -> std::string {
+            spdlog::info("Refreshing access token using refresh token: {}", refresh_token);
+            return "new-access-token";
+        });
+        auto oauth2_auth = std::make_shared<OAuth2Auth>(config);
+        client.setAuthentication(oauth2_auth);
+        auto oauth2_response = client.get("/posts/4");
+        print_response_summary(oauth2_response);
+
+        // 5. Clear Authentication
+        spdlog::info("\n[TEST] 5. Clearing Authentication");
         client.setAuthentication(nullptr);
 
         spdlog::info("[AUTH] Cleared authentication");
