@@ -2,3 +2,8 @@
 [submodule "3rdparty/spdlog"]
 	path = 3rdparty/spdlog
 	url = https://github.com/gabime/spdlog.git
+
+# loki-secure-sdk
+[submodule "3rdparty/loki-secure-sdk"]
+	path = 3rdparty/loki-secure-sdk
+	url = https://github.com/loki2001-dev/loki-secure-sdk.git
