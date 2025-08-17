@@ -6,7 +6,11 @@
 #include "../include/cpprest-client/HttpClientImpl.h"
 #include "../include/cpprest-client/Config.h"
 #include "../include/cpprest-client/Exceptions.h"
+#include "../include/cpprest-client/BearerAuth.h"
+#include "../include/cpprest-client/BasicAuth.h"
+#include "../include/cpprest-client/DigestAuth.h"
 #include <spdlog/spdlog.h>
+#include <cpprest/http_msg.h>
 
 using namespace cpprest_client;
 
@@ -21,6 +25,12 @@ void print_response_summary(const HttpResponse &response, int request_num = 0) {
         auto content_type = response.headers.find("content-type");
         if (content_type != response.headers.end()) {
             spdlog::info("[RESPONSE] Content-Type: {}", content_type->second);
+        }
+
+        // Show authorization header if present (for testing)
+        auto auth_header = response.headers.find("authorization");
+        if (auth_header != response.headers.end()) {
+            spdlog::info("[RESPONSE] Authorization header was processed");
         }
 
         // Truncate body for readability
@@ -63,7 +73,30 @@ void demo_basic_requests(HttpClientImpl &client) {
         auto put_response = client.put_json("/posts/1", put_data);
         print_response_summary(put_response);
 
-        // Skip PATCH, DELETE, HEAD, OPTIONS for brevity in performance tests
+        // 4. PATCH Request
+        spdlog::info("\n[TEST] 4. Executing PATCH /posts/1");
+        web::json::value patch_data;
+        patch_data["title"] = web::json::value::string("Patched Title");
+
+        auto patch_response = client.patch_json("/posts/1", patch_data);
+        print_response_summary(patch_response);
+
+        // 5. DELETE Request
+        spdlog::info("\n[TEST] 5. Executing DELETE /posts/1");
+        auto delete_response = client.del("/posts/1");
+        print_response_summary(delete_response);
+
+        // 6. HEAD Request
+        spdlog::info("\n[TEST] 6. Executing HEAD /posts/1");
+        auto head_response = client.head("/posts/1");
+        spdlog::info("[RESPONSE] HEAD Status: {} | Headers count: {}",
+                     head_response.status_code, head_response.headers.size());
+
+        // 7. OPTIONS Request
+        spdlog::info("\n[TEST] 7. Executing OPTIONS /posts");
+        auto options_response = client.options("/posts");
+        print_response_summary(options_response);
+
         spdlog::info("[DEMO] Basic HTTP methods demonstration completed successfully");
 
     } catch (const std::exception &e) {
@@ -236,24 +269,78 @@ void demo_http2_features(HttpClientImpl &client) {
     }
 }
 
-void demo_bearer_token(HttpClientImpl &client) {
-    spdlog::info("\n[DEMO] === BEARER TOKEN AUTHENTICATION DEMONSTRATION ===");
+void demo_authentication_strategies(HttpClientImpl &client) {
+    spdlog::info("\n[DEMO] === AUTHENTICATION STRATEGIES DEMONSTRATION ===");
 
     try {
-        // Configure Bearer Token
-        spdlog::info("[CONFIG] Setting up Bearer Token authentication");
-        Config config = client.get_config();
-        config.add_default_header("Authorization", "Bearer your-secret-token-12345");
-        client.update_config(config);
+        // 1. Bearer Token Authentication
+        spdlog::info("\n[TEST] 1. Bearer Token Authentication");
+        auto bearer_auth = std::make_shared<BearerAuth>("secret-token-12345");
+        client.setAuthentication(bearer_auth);
 
-        spdlog::info("[TEST] Executing authenticated request with Bearer Token");
-        auto auth_response = client.get("/posts/1");
-        print_response_summary(auth_response);
+        spdlog::info("[AUTH] Setting Bearer Token authentication");
+        auto bearer_response = client.get("/posts/1");
+        print_response_summary(bearer_response);
 
-        spdlog::info("[DEMO] Bearer token authentication demonstration completed");
+        // 2. Basic Authentication
+        spdlog::info("\n[TEST] 2. Basic Authentication");
+        auto basic_auth = std::make_shared<BasicAuth>("username", "password");
+        client.setAuthentication(basic_auth);
+        auto basic_response = client.get("/posts/2");
+        print_response_summary(basic_response);
+
+        // 3. Digest Authentication
+        spdlog::info("\n[TEST] 3. Digest Authentication");
+        auto digest_auth = std::make_shared<DigestAuth>("user", "pass", "realm", "nonce");
+        client.setAuthentication(digest_auth);
+        auto digest_response = client.get("/posts/3");
+        print_response_summary(digest_response);
+
+        // 4. Clear Authentication
+        spdlog::info("\n[TEST] 4. Clearing Authentication");
+        client.setAuthentication(nullptr);
+
+        spdlog::info("[AUTH] Cleared authentication");
+        auto no_auth_response = client.get("/posts/3");
+        print_response_summary(no_auth_response);
+
+        spdlog::info("[DEMO] Authentication strategies demonstration completed successfully");
 
     } catch (const std::exception &e) {
-        spdlog::error("[ERROR] Bearer token demo failed: {}", e.what());
+        spdlog::error("[ERROR] Authentication demo failed: {}", e.what());
+    }
+}
+
+void demo_custom_headers_and_config(HttpClientImpl &client) {
+    spdlog::info("\n[DEMO] === CUSTOM HEADERS AND CONFIGURATION ===");
+
+    try {
+        // Test with custom headers per request
+        spdlog::info("\n[TEST] Request with custom headers");
+        std::unordered_map <std::string, std::string> custom_headers = {
+                {"X-Custom-Header", "CustomValue123"},
+                {"X-Request-ID",    "req-" + std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::system_clock::now().time_since_epoch()).count())},
+                {"Accept-Language", "en-US,en;q=0.9"}
+        };
+
+        auto response_with_headers = client.get("/posts/1", custom_headers);
+        print_response_summary(response_with_headers);
+
+        // Test configuration update
+        spdlog::info("\n[TEST] Dynamic configuration update");
+        Config new_config = client.get_config();
+        new_config.add_default_header("X-Client-Version", "2.0.0");
+        new_config.add_default_header("X-Environment", "demo");
+        client.update_config(new_config);
+
+        auto response_with_updated_config = client.get("/posts/2");
+        print_response_summary(response_with_updated_config);
+
+        spdlog::info("[DEMO] Custom headers and configuration demonstration completed");
+
+    } catch (const std::exception &e) {
+        spdlog::error("[ERROR] Custom headers demo failed: {}", e.what());
     }
 }
 
@@ -261,7 +348,7 @@ int main() {
     try {
         // Set log level to info to reduce noise, change to debug for detailed logging
         spdlog::set_level(spdlog::level::info);
-        spdlog::info("[MAIN] === Enhanced HTTP Client Example with HTTP/2 & Connection Pool ===");
+        spdlog::info("[MAIN] === Enhanced HTTP Client Example with HTTP/2 & Connection Pool & Authentication ===");
 
         Config config_with_pool;
 
@@ -279,34 +366,44 @@ int main() {
             config_with_pool.max_connections_per_host = 6;
             config_with_pool.connection_idle_timeout = std::chrono::seconds(30);
             config_with_pool.max_concurrent_streams = 100;
-        }
 
+            // Timeout settings
+            config_with_pool.connect_timeout = std::chrono::seconds(10);
+            config_with_pool.read_timeout = std::chrono::seconds(30);
+        }
 
         HttpClientImpl client_with_pool(config_with_pool);
 
         // 2. Configuration without Connection Pool (for performance comparison)
-        {
-            Config config_without_pool = config_with_pool;
-            config_without_pool.enable_connection_pool = false;
-            HttpClientImpl client_without_pool(config_without_pool);
+        Config config_without_pool = config_with_pool;
+        config_without_pool.enable_connection_pool = false;
+        HttpClientImpl client_without_pool(config_without_pool);
 
-            // Execute Demonstrations
-            spdlog::info("[MAIN] Starting demonstration sequence");
-            demo_basic_requests(client_with_pool);
-            demo_async_requests(client_with_pool);
-            demo_http2_features(client_with_pool);
-            demo_connection_pool_performance(client_with_pool, client_without_pool);
-            demo_bearer_token(client_with_pool);
+        // Execute Demonstrations
+        spdlog::info("[MAIN] Starting comprehensive demonstration sequence");
 
-            // Display Current Configuration Summary
-            spdlog::info("\n\n[CONFIG] === FINAL CONFIGURATION SUMMARY ===");
-            const auto &current_config = client_with_pool.get_config();
-            spdlog::info("[CONFIG] Base URL: {}", current_config.base_url);
-            spdlog::info("[CONFIG] HTTP/2: {}", current_config.enable_http2 ? "ENABLED" : "DISABLED");
-            spdlog::info("[CONFIG] Connection Pool: {}", current_config.enable_connection_pool ? "ENABLED" : "DISABLED");
-            spdlog::info("[CONFIG] Keep-Alive: {}", current_config.enable_keep_alive ? "ENABLED" : "DISABLED");
-            spdlog::info("[CONFIG] Max Connections/Host: {}", current_config.max_connections_per_host);
-            spdlog::info("[CONFIG] Max Concurrent Streams: {}", current_config.max_concurrent_streams);
+        demo_basic_requests(client_with_pool);
+        demo_async_requests(client_with_pool);
+        demo_authentication_strategies(client_with_pool);
+        demo_custom_headers_and_config(client_with_pool);
+        demo_http2_features(client_with_pool);
+        demo_connection_pool_performance(client_with_pool, client_without_pool);
+
+        // Display Final Configuration Summary
+        spdlog::info("\n\n[CONFIG] === FINAL CONFIGURATION SUMMARY ===");
+        const auto &current_config = client_with_pool.get_config();
+        spdlog::info("[CONFIG] Base URL: {}", current_config.base_url);
+        spdlog::info("[CONFIG] HTTP/2: {}", current_config.enable_http2 ? "ENABLED" : "DISABLED");
+        spdlog::info("[CONFIG] Connection Pool: {}", current_config.enable_connection_pool ? "ENABLED" : "DISABLED");
+        spdlog::info("[CONFIG] Keep-Alive: {}", current_config.enable_keep_alive ? "ENABLED" : "DISABLED");
+        spdlog::info("[CONFIG] Max Connections/Host: {}", current_config.max_connections_per_host);
+        spdlog::info("[CONFIG] Max Concurrent Streams: {}", current_config.max_concurrent_streams);
+        spdlog::info("[CONFIG] Connect Timeout: {}s", current_config.connect_timeout.count());
+        spdlog::info("[CONFIG] Read Timeout: {}s", current_config.read_timeout.count());
+
+        spdlog::info("\n[CONFIG] Default Headers:");
+        for (const auto &[key, value]: current_config.default_headers) {
+            spdlog::info("[CONFIG]   {}: {}", key, value);
         }
 
         spdlog::info("\n[MAIN] === ALL DEMONSTRATIONS COMPLETED SUCCESSFULLY ===");
