@@ -1,6 +1,7 @@
 #pragma once
 
 #include "IHttpClient.h"
+#include "IAuthenticationStrategy.h"
 #include "Config.h"
 #include "Exceptions.h"
 #include <cpprest/http_client.h>
@@ -14,6 +15,7 @@ namespace cpprest_client {
     private:
         Config _config;
         std::shared_ptr <spdlog::logger> _logger;
+        std::shared_ptr <IAuthenticationStrategy> _auth;
 
         // Connection Pool
         static std::unordered_map <std::string, std::shared_ptr<web::http::client::http_client>> _connection_pool;
@@ -62,6 +64,8 @@ namespace cpprest_client {
         void update_config(const Config &config);
 
         const Config &get_config() const { return _config; }
+
+        void setAuthentication(std::shared_ptr <IAuthenticationStrategy> auth);
 
         // IHttpClient
         HttpResponse get(const std::string &url,

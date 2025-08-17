@@ -40,6 +40,10 @@ namespace cpprest_client {
         cleanup_expired_connections();
     }
 
+    void HttpClientImpl::setAuthentication(std::shared_ptr <IAuthenticationStrategy> auth) {
+        _auth = std::move(auth);
+    }
+
     void HttpClientImpl::update_config(const Config &config) {
         _config = config;
 
@@ -323,7 +327,7 @@ namespace cpprest_client {
             std::string method_str = utility::conversions::to_utf8string(method);
             auto merged_headers = merge_headers(headers);
 
-            auto send_request = [this, client, method, body, merged_headers, full_url, base_url]() mutable -> pplx::task <HttpResponse> {
+            auto send_request = [this, client, method, body, merged_headers, full_url]() -> pplx::task <HttpResponse> {
                 web::http::http_request req(method);
                 req.headers() = merged_headers;
 
@@ -334,6 +338,11 @@ namespace cpprest_client {
                 if (!body.empty()) {
                     req.set_body(utility::conversions::to_string_t(body));
                     _logger->debug("[REQUEST] Body size: {} bytes", body.length());
+                }
+
+                // Apply authentication if available
+                if (_auth) {
+                    _auth->apply(req);
                 }
 
                 return client->request(req).then([this](web::http::http_response response) {
