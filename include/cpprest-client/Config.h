@@ -3,23 +3,24 @@
 #include <string>
 #include <unordered_map>
 #include <chrono>
+#include <functional>
 
 namespace cpprest_client {
 
     struct Config {
-        // Basic settings
+        // ===== Basic settings =====
         std::string base_url;
         std::string user_agent = "CppRest-Client/1.0";
         std::unordered_map<std::string, std::string> default_headers;
 
-        // Timeout settings
+        // ===== Timeout settings =====
         std::chrono::milliseconds connect_timeout{10000};  // 10 seconds
         std::chrono::milliseconds read_timeout{30000};     // 30 seconds
 
-        // SSL settings
+        // ===== SSL settings =====
         bool verify_ssl = true;
 
-        // HTTP/2 and Connection Pool settings
+        // ===== HTTP/2 and Connection Pool settings =====
         bool enable_http2 = true;
         bool enable_connection_pool = true;
         bool enable_keep_alive = true;
@@ -27,7 +28,15 @@ namespace cpprest_client {
         std::chrono::seconds connection_idle_timeout{30};
         size_t max_concurrent_streams = 100;  // HTTP/2 multiplexing streams
 
-        // Utility methods
+        // ===== OAuth2 / JWT Refresh =====
+        std::string access_token;
+        std::string refresh_token;
+        std::chrono::system_clock::time_point token_expiry;
+
+        // Callback for refreshing token
+        std::function<std::string(const std::string& refresh_token)> refresh_token_callback;
+
+        // ===== Utility methods =====
         void add_default_header(const std::string& key, const std::string& value) {
             default_headers[key] = value;
         }
@@ -41,12 +50,42 @@ namespace cpprest_client {
             add_default_header("Accept", "application/json");
         }
 
-        void set_bearer_token(const std::string& token) {
+        void set_bearer_token(const std::string& token,
+                              std::chrono::seconds expires_in = std::chrono::seconds(0)) {
+            access_token = token;
             add_default_header("Authorization", "Bearer " + token);
+            if (expires_in.count() > 0) {
+                token_expiry = std::chrono::system_clock::now() + expires_in;
+            }
         }
 
         void remove_bearer_token() {
+            access_token.clear();
             remove_default_header("Authorization");
+        }
+
+        void set_refresh_token(const std::string& token) {
+            refresh_token = token;
+        }
+
+        void set_refresh_callback(std::function<std::string(const std::string&)> callback) {
+            refresh_token_callback = std::move(callback);
+        }
+
+        bool is_token_expired() const {
+            return !access_token.empty() &&
+                   std::chrono::system_clock::now() >= token_expiry;
+        }
+
+        bool refresh_access_token_if_needed() {
+            if (is_token_expired() && refresh_token_callback) {
+                std::string new_token = refresh_token_callback(refresh_token);
+                if (!new_token.empty()) {
+                    set_bearer_token(new_token, std::chrono::seconds(3600)); // 기본 1시간
+                    return true;
+                }
+            }
+            return false;
         }
 
         void set_basic_auth(const std::string& username, const std::string& password) {
@@ -62,7 +101,7 @@ namespace cpprest_client {
             add_default_header("User-Agent", agent);
         }
 
-        // HTTP/2 specific settings
+        // ===== HTTP/2 specific settings =====
         void enable_http2_features() {
             enable_http2 = true;
             enable_connection_pool = true;
@@ -75,7 +114,7 @@ namespace cpprest_client {
             max_concurrent_streams = 1;
         }
 
-        // Connection pool specific settings
+        // ===== Connection pool specific settings =====
         void configure_connection_pool(size_t max_connections, std::chrono::seconds idle_timeout) {
             enable_connection_pool = true;
             max_connections_per_host = max_connections;
@@ -86,7 +125,7 @@ namespace cpprest_client {
             enable_connection_pool = false;
         }
 
-        // Performance tuning presets
+        // ===== Performance tuning presets =====
         void set_high_performance_preset() {
             enable_http2 = true;
             enable_connection_pool = true;
@@ -109,7 +148,7 @@ namespace cpprest_client {
             read_timeout = std::chrono::milliseconds(60000);
         }
 
-        // Debug/logging helpers
+        // ===== Debug/logging helpers =====
         std::string to_string() const {
             std::string result = "Config {\n";
             result += "  base_url: " + base_url + "\n";
@@ -123,6 +162,8 @@ namespace cpprest_client {
             result += "  connect_timeout: " + std::to_string(connect_timeout.count()) + "ms\n";
             result += "  read_timeout: " + std::to_string(read_timeout.count()) + "ms\n";
             result += "  verify_ssl: " + std::string(verify_ssl ? "true" : "false") + "\n";
+            result += "  access_token: " + std::string(access_token.empty() ? "(none)" : "***") + "\n";
+            result += "  refresh_token: " + std::string(refresh_token.empty() ? "(none)" : "***") + "\n";
             result += "  default_headers: {\n";
             for (const auto& [key, value] : default_headers) {
                 result += "    " + key + ": " + value + "\n";
