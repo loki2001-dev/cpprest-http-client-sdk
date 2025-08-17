@@ -18,7 +18,8 @@ FIND_PACKAGE(Boost REQUIRED COMPONENTS system filesystem thread chrono)
 FIND_PACKAGE(OpenSSL REQUIRED)
 FIND_PACKAGE(cpprestsdk REQUIRED)
 
-ADD_SUBDIRECTORY(3rdparty/spdlog)
+ADD_SUBDIRECTORY(3rdparty/loki-secure-sdk)
+#ADD_SUBDIRECTORY(3rdparty/spdlog)
 
 ADD_LIBRARY(cpprest-http-client-sdk
         src/HttpClientImpl.cpp
@@ -38,6 +39,7 @@ TARGET_LINK_LIBRARIES(cpprest-http-client-sdk PUBLIC
         Boost::chrono
         OpenSSL::SSL
         OpenSSL::Crypto
+        loki-secure-sdk
         spdlog::spdlog
 )
 
@@ -46,11 +48,22 @@ TARGET_COMPILE_DEFINITIONS(cpprest-http-client-sdk PUBLIC ${CPPREST_CFLAGS_OTHER
 # EXAMPLE
 OPTION(BUILD_EXAMPLES "Build examples" ON)
 IF(BUILD_EXAMPLES)
-    ADD_EXECUTABLE(http_client_example example/main.cpp)
-    TARGET_LINK_LIBRARIES(http_client_example PRIVATE cpprest-http-client-sdk)
+    ADD_EXECUTABLE(http_client_example
+            example/main.cpp
+            src/DigestAuth.cpp
+    )
 
-    ADD_EXECUTABLE(http_client_coroutine_example example/main_co.cpp)
-    TARGET_LINK_LIBRARIES(http_client_coroutine_example PRIVATE cpprest-http-client-sdk)
+    TARGET_LINK_LIBRARIES(http_client_example PRIVATE
+            cpprest-http-client-sdk
+    )
+
+    ADD_EXECUTABLE(http_client_coroutine_example
+            example/main_co.cpp
+    )
+
+    TARGET_LINK_LIBRARIES(http_client_coroutine_example PRIVATE
+            cpprest-http-client-sdk
+    )
 ENDIF()
 
 # TEST(TDD)
