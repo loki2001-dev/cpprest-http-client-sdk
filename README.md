@@ -4,6 +4,7 @@
 - Modern C++20 HTTP client SDK powered by Microsoft's cpprest library.
 - Offering synchronous, asynchronous, and coroutine-based APIs.
 - Designed for simplicity, performance, and reliability.
+- Implemented using a strategy pattern and an interface pattern for a clean architecture.
 
 ---
 
@@ -18,7 +19,7 @@
 - Comprehensive Tests: Google Test-based unit tests
 - Exception Safety: Clear exception hierarchy
 - **HTTP/2** Support: Modern, efficient transport with multiplexing
-- **Connection Pool**: Optimized resource reuse for high-performance workloads
+- **Connection Pool**: Optimized resource reuse for high-performance workloads (Keep-Alive)
 
 ---
 
@@ -51,6 +52,8 @@ sudo apt-get install libcpprest-dev libboost-all-dev libssl-dev libgtest-dev
 
 ## Running Tests Examples
 ```bash
+cd build
+
 # Basic example
 ./http_client_example
 
