@@ -83,36 +83,38 @@ IF(BUILD_TESTS)
 ENDIF()
 
 # INSTALL RULE
-INSTALL(TARGETS cpprest-http-client-sdk EXPORT cpprest-http-client-sdkTargets
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib
-        RUNTIME DESTINATION bin
-)
+IF(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    INSTALL(TARGETS cpprest-http-client-sdk EXPORT cpprest-http-client-sdkTargets
+            LIBRARY DESTINATION lib
+            ARCHIVE DESTINATION lib
+            RUNTIME DESTINATION bin
+    )
 
-INSTALL(DIRECTORY include/ DESTINATION include)
+    INSTALL(DIRECTORY include/ DESTINATION include)
 
-INSTALL(EXPORT cpprest-http-client-sdkTargets
-        FILE cpprest-http-client-sdkTargets.cmake
-        NAMESPACE cpprest-http-client-sdk::
-        DESTINATION lib/cmake/cpprest-http-client-sdk
-)
+    INSTALL(EXPORT cpprest-http-client-sdkTargets
+            FILE cpprest-http-client-sdkTargets.cmake
+            NAMESPACE cpprest-http-client-sdk::
+            DESTINATION lib/cmake/cpprest-http-client-sdk
+    )
 
-# CMake CONFIG
-INCLUDE(CMakePackageConfigHelpers)
-CONFIGURE_PACKAGE_CONFIG_FILE(
-        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cpprest_clientConfig.cmake.in"
-        "${CMAKE_CURRENT_BINARY_DIR}/cpprest_clientConfig.cmake"
-        INSTALL_DESTINATION lib/cmake/cpprest-http-client-sdk
-)
+    # CMake CONFIG
+    INCLUDE(CMakePackageConfigHelpers)
+    CONFIGURE_PACKAGE_CONFIG_FILE(
+            "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cpprest_clientConfig.cmake.in"
+            "${CMAKE_CURRENT_BINARY_DIR}/cpprest_clientConfig.cmake"
+            INSTALL_DESTINATION lib/cmake/cpprest-http-client-sdk
+    )
 
-WRITE_BASIC_PACKAGE_VERSION_FILE(
-        "${CMAKE_CURRENT_BINARY_DIR}/cpprest_clientConfigVersion.cmake"
-        VERSION ${PROJECT_VERSION}
-        COMPATIBILITY SameMajorVersion
-)
+    WRITE_BASIC_PACKAGE_VERSION_FILE(
+            "${CMAKE_CURRENT_BINARY_DIR}/cpprest_clientConfigVersion.cmake"
+            VERSION ${PROJECT_VERSION}
+            COMPATIBILITY SameMajorVersion
+    )
 
-INSTALL(FILES
-        "${CMAKE_CURRENT_BINARY_DIR}/cpprest_clientConfig.cmake"
-        "${CMAKE_CURRENT_BINARY_DIR}/cpprest_clientConfigVersion.cmake"
-        DESTINATION lib/cmake/cpprest-http-client-sdk
-)
+    INSTALL(FILES
+            "${CMAKE_CURRENT_BINARY_DIR}/cpprest_clientConfig.cmake"
+            "${CMAKE_CURRENT_BINARY_DIR}/cpprest_clientConfigVersion.cmake"
+            DESTINATION lib/cmake/cpprest-http-client-sdk
+    )
+ENDIF()
