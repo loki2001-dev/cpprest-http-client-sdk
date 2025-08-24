@@ -24,6 +24,7 @@ ADD_SUBDIRECTORY(3rdparty/loki-secure-sdk)
 ADD_LIBRARY(cpprest-http-client-sdk
         src/HttpClientImpl.cpp
         src/HttpClientCo.cpp
+        src/DigestAuth.cpp
 )
 
 TARGET_INCLUDE_DIRECTORIES(cpprest-http-client-sdk PUBLIC
